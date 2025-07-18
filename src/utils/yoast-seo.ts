@@ -1,51 +1,64 @@
 "use client";
-//@ts-ignore
-import { Paper, Researcher, SeoAssessor, ContentAssessor } from "yoastseo";
 
-export function analyzeSeo({
-  title,
-  description,
-  keyword,
-}: {
-  title: string;
-  description: string;
-  keyword: string;
-}) {
-  const paper = new Paper({
+import {
+  Paper,
+  languageProcessing,
+  assessments,
+  SeoAssessor,
+  ContentAssessor,
+  interpreters,
+} from "yoastseo";
+
+const resultToVM = (result: any) => {
+  const { _identifier, score, text, marks, editFieldName } = result;
+  return {
+    _identifier,
+    score,
+    text,
+    marks,
+    editFieldName,
+    rating: interpreters.scoreToRating(score),
+  };
+};
+
+export function analyzeSeo({title, description, keyword}: {title: string, description: string, keyword: string}) {
+  const KeyphraseDistributionAssessment =
+    assessments.seo.KeyphraseDistributionAssessment;
+  const TextTitleAssessment = assessments.seo.TextTitleAssessment;
+  const WordComplexityAssessment =
+    assessments.readability.WordComplexityAssessment;
+  const TextAlignmentAssessment =
+    assessments.readability.TextAlignmentAssessment;
+
+  const paper = new Paper(title, {
     title: title,
     description: description,
     keyword: keyword,
     locale: "en_US",
   });
-
+  
   console.log("Paper", paper);
 
-  const seoAssessor = new SeoAssessor(paper);
-  console.log("seoAssessor", seoAssessor);
+  const researcher = new languageProcessing.AbstractResearcher(paper);
 
-  const contentAssessor = new ContentAssessor(paper);
-  console.log("contentAssessor", contentAssessor);
+  const seoAssessor = new SeoAssessor(researcher);
+  seoAssessor.addAssessment(
+    "keyphraseDistribution",
+    new KeyphraseDistributionAssessment()
+  );
+  seoAssessor.addAssessment("TextTitleAssessment", new TextTitleAssessment());
+  seoAssessor.assess(paper);
 
-  // const researcher = new Researcher(paper);
-  // const results = researcher.getSEOAnalysis();
-
-  // const titleResults = results.filter((r) => r.identifier === "titleWidth");
-  // const descResults = results.filter((r) => r.identifier === "metaDescriptionLength");
-
-  seoAssessor.assess();
-  contentAssessor.assess();
-
-  const seoResults = seoAssessor.getResults();
-  const contentResults = contentAssessor.getResults();
-
-  const allResults = [...seoResults, ...contentResults];
-
-  const titleResults = allResults.filter((r) => r.identifier === "titleWidth");
-  const descResults = allResults.filter((r) => r.identifier === "metaDescriptionLength");
+  const contentAssessor = new ContentAssessor(researcher);
+  contentAssessor.addAssessment(
+    "wordComplexity",
+    new WordComplexityAssessment()
+  );
+  contentAssessor.addAssessment("textAlignment", new TextAlignmentAssessment());
+  contentAssessor.assess(paper);
 
   return {
-    titleResults,
-    descResults,
-    allResults,
+    contentResults: contentAssessor.getValidResults().map(resultToVM),
+    seoResults: seoAssessor.getValidResults().map(resultToVM),
   };
 }
